@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Solar PV Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: linear-gradient(180deg, #eaf6ff 0%, #ffffff 100%);
+    color: #002b5c;
+    text-align: center;
+    padding: 50px;
+  }
+  h1 { margin-bottom: 40px; font-size: 2.5em; }
+  .cards-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 50px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    padding: 30px;
+    width: 260px;
+    min-height: 150px;
+    transition: transform 0.2s;
+  }
+  .card:hover { transform: scale(1.05); }
+  .value { font-size: 2.5em; margin-top: 10px; color: #0078d7; }
+  .label { font-size: 1em; color: #666; }
+  .updated { margin-top: 40px; color: #999; font-size: 0.9em; }
+  canvas { max-width: 800px; margin: auto; display: block; margin-bottom: 50px; }
+</style>
+</head>
+<body>
+
+<h1>School Solar PV Dashboard</h1>
+
+<div class="cards-container">
+  <div class="card">
+    <div class="label">Current PV Power</div>
+    <div class="value" id="pv_power">0 kW</div>
+  </div>
+  <div class="card">
+    <div class="label">Daily Yield</div>
+    <div class="value" id="yield_today">0 kWh</div>
+  </div>
+  <div class="card">
+    <div class="label">Daily Consumption</div>
+    <div class="value" id="consumption">0 kWh</div>
+  </div>
+  <div class="card">
+    <div class="label">Imported Energy</div>
+    <div class="value" id="imported">0 kWh</div>
+  </div>
+</div>
+
+<div class="updated" id="updated_time">Last updated: --</div>
+
+<!-- Line chart for PV Power over time -->
+<canvas id="pvChart" height="200"></canvas>
+
+<!-- Bar chart for Generation vs Consumption -->
+<canvas id="barChart" height="200"></canvas>
+
+<script>
+let timeLabels = [];
+let pvData = [];
+
+// Line chart setup (PV Power over time)
+const ctxLine = document.getElementById('pvChart').getContext('2d');
+const pvChart = new Chart(ctxLine, {
+    type: 'line',
+    data: {
+        labels: timeLabels,
+        datasets: [{
+            label: 'PV Power (kW)',
+            data: pvData,
+            borderColor: '#0078d7',
+            backgroundColor: 'rgba(0,120,215,0.2)',
+            fill: true,
+            tension: 0.3
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            x: { title: { display: true, text: 'Time' } },
+            y: { title: { display: true, text: 'Power (kW)' }, beginAtZero: true }
+        }
+    }
+});
+
+// Bar chart setup (Generation vs Consumption)
+const ctxBar = document.getElementById('barChart').getContext('2d');
+const barChart = new Chart(ctxBar, {
+    type: 'bar',
+    data: {
+        labels: ['Generated', 'Consumed'],
+        datasets: [{
+            label: 'Energy (kWh)',
+            data: [0, 0],
+            backgroundColor: ['#0078d7', '#00b894']
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: { title: { display: true, text: 'Energy (kWh)' }, beginAtZero: true }
+        }
+    }
+});
+
+async function updateDashboard() {
+    try {
+        const res = await fetch("http://127.0.0.1:5000/live");
+        const data = await res.json();
+
+        const now = new Date();
+        const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+        // Update cards
+        document.getElementById("pv_power").textContent = data.pv_power_kw + " kW";
+        document.getElementById("yield_today").textContent = data.yield_today_kwh + " kWh";
+        document.getElementById("consumption").textContent = data.consumption_kwh + " kWh";
+        document.getElementById("imported").textContent = data.imported_kwh + " kWh";
+        document.getElementById("updated_time").textContent = "Last updated: " + data.last_update;
+
+        // Update line chart
+        if (timeLabels.length > 30) {
+            timeLabels.shift();
+            pvData.shift();
+        }
+        timeLabels.push(timeStr);
+        pvData.push(data.pv_power_kw);
+        pvChart.update();
+
+        // Update bar chart
+        barChart.data.datasets[0].data = [data.yield_today_kwh, data.consumption_kwh];
+        barChart.update();
+
+    } catch(err) {
+        console.error("Error updating dashboard:", err);
+    }
+}
+
+// Initial load
+updateDashboard();
+// Refresh every 5 minutes (300000 ms)
+setInterval(updateDashboard, 300000);
+</script>
+
+</body>
+</html>
+
