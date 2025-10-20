@@ -41,6 +41,8 @@ Run a local web server -
 python -m http.server 8000
 in terminal
 
+OR Just run the program directly from files into google chrome
+
 Step 6:
 
 Open up the files app and open the HTML with google chrome 
